@@ -25,13 +25,17 @@ uploaded_files = st.file_uploader(
 )
 
 # Dicionário de repasse por assessor para a seção PNL
+# use sempre o nome em maiúsculas, igual vem na planilha tratada
 repasse_por_assessor = {
     "PEDRO AMMAR FORATO": 0.80,
     # "LEONARDO BARBOSA FRISONI": 0.70,
-    # adicione os demais aqui, sempre em maiúsculas
+    # "OUTRO ASSESSOR": 0.65,
 }
 
 default_repasse = 0.70
+
+ALIQUOTA_IMPOSTO = 0.1953
+FATOR_LIQUIDO = 1 - ALIQUOTA_IMPOSTO  # 0.8047
 
 
 def get_repasse(assessor):
@@ -39,6 +43,10 @@ def get_repasse(assessor):
         return default_repasse
     chave = str(assessor).strip().upper()
     return repasse_por_assessor.get(chave, default_repasse)
+
+
+def formata_brl(x):
+    return f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def tratar_relatorio(file, competencia_date):
@@ -74,7 +82,7 @@ def tratar_relatorio(file, competencia_date):
     # Remover linhas de subtotal: Conta vazia
     df2 = df2[df2["Conta"].notna()]
 
-    # Remover linhas totalmente sem valores numéricos (segurança extra)
+    # Remover linhas totalmente sem valores numéricos
     df2 = df2[~(df2["Receita_Liquida"].isna() & df2["Comissao"].isna())]
 
     # Adicionar competência
@@ -170,9 +178,10 @@ if all_dfs:
         .sort_values("Mes_Ano")
     )
 
+    # Para PNL do mês e acumulado no ano, já deixo Ano junto
     df_ass_mes = (
-        base.groupby(["Mes_Ano", "Assessor"], as_index=False)["Comissao"].sum()
-        .sort_values(["Mes_Ano", "Assessor"])
+        base.groupby(["Ano", "Mes_Ano", "Assessor"], as_index=False)["Comissao"].sum()
+        .sort_values(["Ano", "Mes_Ano", "Assessor"])
     )
 
     st.subheader("Filtros")
@@ -249,70 +258,135 @@ if all_dfs:
 
     st.markdown("---")
 
-    # Seção PNL
+    # Seção PNL do mês
     st.subheader(f"PNL por assessor em {mes_selecionado}")
 
-    df_pnl = df_ass_mes[df_ass_mes["Mes_Ano"] == mes_selecionado].copy()
-    if df_pnl.empty:
+    df_pnl_mes = df_ass_mes[df_ass_mes["Mes_Ano"] == mes_selecionado].copy()
+    if df_pnl_mes.empty:
         st.warning("Nenhum dado para calcular PNL neste mês.")
     else:
-        # Calcula repasse, quanto vai para o assessor e quanto fica na empresa
-        df_pnl["Repasse"] = df_pnl["Assessor"].apply(get_repasse)
-        df_pnl["Para_Assessor"] = df_pnl["Comissao"] * df_pnl["Repasse"]
-        df_pnl["Para_Empresa"] = df_pnl["Comissao"] - df_pnl["Para_Assessor"]
+        # Comissão líquida após imposto
+        df_pnl_mes["Comissao_Liquida"] = df_pnl_mes["Comissao"] * FATOR_LIQUIDO
 
-        df_pnl = df_pnl.sort_values("Comissao", ascending=False)
+        # Repasse em cima da comissão líquida
+        df_pnl_mes["Repasse"] = df_pnl_mes["Assessor"].apply(get_repasse)
+        df_pnl_mes["Para_Assessor"] = df_pnl_mes["Comissao_Liquida"] * df_pnl_mes["Repasse"]
+        df_pnl_mes["Para_Empresa"] = df_pnl_mes["Comissao_Liquida"] - df_pnl_mes["Para_Assessor"]
 
-        # Tabela formatada para exibição
-        tabela_pnl = df_pnl[[
-            "Assessor",
-            "Comissao",
-            "Repasse",
-            "Para_Assessor",
-            "Para_Empresa"
-        ]].reset_index(drop=True)
+        df_pnl_mes = df_pnl_mes.sort_values("Comissao_Liquida", ascending=False)
 
-        # Formatação brasileira de moeda
-        def formata_brl(x):
-            return f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        tabela_pnl_mes = pd.DataFrame({
+            "Assessor": df_pnl_mes["Assessor"],
+            "Comissão bruta": df_pnl_mes["Comissao"],
+            "Comissão líquida": df_pnl_mes["Comissao_Liquida"],
+            "Repasse": df_pnl_mes["Repasse"],
+            "Para assessor": df_pnl_mes["Para_Assessor"],
+            "Para empresa": df_pnl_mes["Para_Empresa"],
+        }).reset_index(drop=True)
 
-        for col in ["Comissao", "Para_Assessor", "Para_Empresa"]:
-            tabela_pnl[col] = tabela_pnl[col].apply(formata_brl)
+        for col in ["Comissão bruta", "Comissão líquida", "Para assessor", "Para empresa"]:
+            tabela_pnl_mes[col] = tabela_pnl_mes[col].apply(formata_brl)
 
-        # Formatar repasse em percentual
-        tabela_pnl["Repasse"] = tabela_pnl["Repasse"].apply(
+        tabela_pnl_mes["Repasse"] = tabela_pnl_mes["Repasse"].apply(
             lambda x: f"{x*100:.0f}%"
         )
 
         col_p1, col_p2 = st.columns([2, 1])
 
         with col_p1:
-            # Gráfico de barras agrupadas mostrando PNL (mantém números brutos)
-            df_plot = df_pnl.melt(
+            df_plot_mes = df_pnl_mes.melt(
                 id_vars=["Assessor"],
                 value_vars=["Para_Assessor", "Para_Empresa"],
                 var_name="Tipo",
                 value_name="Valor"
             )
-            df_plot["Tipo"] = df_plot["Tipo"].replace({
+            df_plot_mes["Tipo"] = df_plot_mes["Tipo"].replace({
                 "Para_Assessor": "Para o assessor",
                 "Para_Empresa": "Para a empresa"
             })
 
-            fig_pnl = px.bar(
-                df_plot,
+            fig_pnl_mes = px.bar(
+                df_plot_mes,
                 x="Assessor",
                 y="Valor",
                 color="Tipo",
                 barmode="group",
                 labels={"Valor": "Valor", "Assessor": "Assessor", "Tipo": "Tipo"},
-                title="PNL por assessor no mês selecionado"
+                title="PNL por assessor no mês selecionado (comissão líquida)"
             )
-            st.plotly_chart(fig_pnl, use_container_width=True)
+            st.plotly_chart(fig_pnl_mes, use_container_width=True)
 
         with col_p2:
-            st.markdown("Tabela de PNL")
-            st.dataframe(tabela_pnl)
+            st.markdown("Tabela de PNL do mês")
+            st.dataframe(tabela_pnl_mes)
+
+    st.markdown("---")
+
+    # Seção PNL acumulado no ano
+    ano_selecionado = int(mes_selecionado.split("-")[0])
+    st.subheader(f"PNL acumulado no ano de {ano_selecionado}")
+
+    df_pnl_ytd = df_ass_mes[df_ass_mes["Ano"] == ano_selecionado].copy()
+    if df_pnl_ytd.empty:
+        st.warning("Nenhum dado para calcular PNL acumulado neste ano.")
+    else:
+        # Soma comissão bruta do ano por assessor
+        df_pnl_ytd = df_pnl_ytd.groupby("Assessor", as_index=False)["Comissao"].sum()
+
+        # Comissão líquida após imposto
+        df_pnl_ytd["Comissao_Liquida"] = df_pnl_ytd["Comissao"] * FATOR_LIQUIDO
+
+        # Repasse em cima da comissão líquida
+        df_pnl_ytd["Repasse"] = df_pnl_ytd["Assessor"].apply(get_repasse)
+        df_pnl_ytd["Para_Assessor"] = df_pnl_ytd["Comissao_Liquida"] * df_pnl_ytd["Repasse"]
+        df_pnl_ytd["Para_Empresa"] = df_pnl_ytd["Comissao_Liquida"] - df_pnl_ytd["Para_Assessor"]
+
+        df_pnl_ytd = df_pnl_ytd.sort_values("Comissao_Liquida", ascending=False)
+
+        tabela_pnl_ytd = pd.DataFrame({
+            "Assessor": df_pnl_ytd["Assessor"],
+            "Comissão bruta": df_pnl_ytd["Comissao"],
+            "Comissão líquida": df_pnl_ytd["Comissao_Liquida"],
+            "Repasse": df_pnl_ytd["Repasse"],
+            "Para assessor": df_pnl_ytd["Para_Assessor"],
+            "Para empresa": df_pnl_ytd["Para_Empresa"],
+        }).reset_index(drop=True)
+
+        for col in ["Comissão bruta", "Comissão líquida", "Para assessor", "Para empresa"]:
+            tabela_pnl_ytd[col] = tabela_pnl_ytd[col].apply(formata_brl)
+
+        tabela_pnl_ytd["Repasse"] = tabela_pnl_ytd["Repasse"].apply(
+            lambda x: f"{x*100:.0f}%"
+        )
+
+        col_y1, col_y2 = st.columns([2, 1])
+
+        with col_y1:
+            df_plot_ytd = df_pnl_ytd.melt(
+                id_vars=["Assessor"],
+                value_vars=["Para_Assessor", "Para_Empresa"],
+                var_name="Tipo",
+                value_name="Valor"
+            )
+            df_plot_ytd["Tipo"] = df_plot_ytd["Tipo"].replace({
+                "Para_Assessor": "Para o assessor",
+                "Para_Empresa": "Para a empresa"
+            })
+
+            fig_pnl_ytd = px.bar(
+                df_plot_ytd,
+                x="Assessor",
+                y="Valor",
+                color="Tipo",
+                barmode="group",
+                labels={"Valor": "Valor", "Assessor": "Assessor", "Tipo": "Tipo"},
+                title="PNL acumulado por assessor no ano selecionado (comissão líquida)"
+            )
+            st.plotly_chart(fig_pnl_ytd, use_container_width=True)
+
+        with col_y2:
+            st.markdown("Tabela de PNL acumulado no ano")
+            st.dataframe(tabela_pnl_ytd)
 
 else:
     # Sem dados consolidados ainda
