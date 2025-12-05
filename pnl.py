@@ -234,10 +234,34 @@ if all_dfs:
         st.warning("Nenhum dado para os assessores selecionados.")
 
     st.subheader(f"Ranking de assessores em {mes_selecionado}")
-    df_ranking = (
-        df_ass_mes[df_ass_mes["Mes_Ano"] == mes_selecionado]
-        .sort_values("Comissao", ascending=False)
+
+df_ranking = (
+    df_ass_mes[df_ass_mes["Mes_Ano"] == mes_selecionado]
+    .sort_values("Comissao", ascending=False)
+).copy()
+
+# Criar tabela formatada
+tabela_ranking = df_ranking.copy()
+tabela_ranking["Comissao"] = tabela_ranking["Comissao"].apply(formata_brl)
+
+col_g1, col_g2 = st.columns([2, 1])
+
+with col_g1:
+    # Gráfico continua com valores numéricos
+    fig_rank = px.bar(
+        df_ranking,
+        x="Comissao",
+        y="Assessor",
+        orientation="h",
+        labels={"Comissao": "Comissão", "Assessor": "Assessor"},
+        title=f"Comissão por assessor em {mes_selecionado}"
     )
+    st.plotly_chart(fig_rank, use_container_width=True)
+
+with col_g2:
+    st.markdown("Tabela de ranking")
+    st.dataframe(tabela_ranking.reset_index(drop=True))
+
 
     col_g1, col_g2 = st.columns([2, 1])
 
