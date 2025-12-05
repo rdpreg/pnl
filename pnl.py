@@ -24,6 +24,7 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
+
 def tratar_relatorio(file, competencia_date):
     """
     Lê o relatório, pega apenas as colunas:
@@ -32,20 +33,21 @@ def tratar_relatorio(file, competencia_date):
     7 -> Receita Líquida
     8 -> Comissão
 
-    Preenche o nome do assessor para baixo
-    Remove cabeçalhos e linhas totalmente vazias
-    Adiciona coluna de competência (mês e ano)
+    Preenche o nome do assessor para baixo.
+    Remove cabeçalhos, linhas vazias e as linhas de subtotal
+    (primeira linha de cada assessor, onde Conta está vazia).
+    Adiciona coluna de competência (mês e ano).
     """
     df = pd.read_excel(file)
 
-    # Seleciona colunas 5, 6, 7, 8 (índices 5,6,7,8)
+    # Seleciona colunas 5, 6, 7, 8 (índices 5, 6, 7, 8)
     df2 = df.iloc[:, [5, 6, 7, 8]].copy()
     df2.columns = ["Assessor", "Conta", "Receita_Liquida", "Comissao"]
 
     # Preencher assessor para baixo
     df2["Assessor"] = df2["Assessor"].ffill()
 
-    # Remover linha de cabeçalho interno e linhas totalmente vazias
+    # Remover cabeçalho interno e linhas com assessor vazio
     df2 = df2[df2["Assessor"].notna()]
     df2 = df2[df2["Assessor"] != "Assessor Principal"]
 
@@ -53,7 +55,10 @@ def tratar_relatorio(file, competencia_date):
     df2["Receita_Liquida"] = pd.to_numeric(df2["Receita_Liquida"], errors="coerce")
     df2["Comissao"] = pd.to_numeric(df2["Comissao"], errors="coerce")
 
-    # Remover linhas sem qualquer valor numérico
+    # Remover linhas de subtotal: Conta vazia
+    df2 = df2[df2["Conta"].notna()]
+
+    # Remover linhas totalmente sem valores numéricos (segurança extra)
     df2 = df2[~(df2["Receita_Liquida"].isna() & df2["Comissao"].isna())]
 
     # Adicionar competência
@@ -64,6 +69,7 @@ def tratar_relatorio(file, competencia_date):
     df2["Mes_Ano"] = df2["Competencia"].dt.strftime("%Y-%m")
 
     return df2
+
 
 all_dfs = []
 
@@ -222,5 +228,5 @@ if all_dfs:
         st.plotly_chart(fig_rank, use_container_width=True)
 
     with col_g2:
-        st.markdown("**Tabela de ranking**")
+        st.markdown("Tabela de ranking")
         st.dataframe(df_ranking.reset_index(drop=True))
