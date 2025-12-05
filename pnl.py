@@ -26,10 +26,46 @@ uploaded_files = st.file_uploader(
 
 # Dicionário de repasse por assessor para a seção PNL
 # use sempre o nome em maiúsculas, igual vem na planilha tratada
+# Dicionário de repasse por assessor para a seção PNL
+# use sempre o nome em maiúsculas, igual vem na planilha tratada
 repasse_por_assessor = {
+    "ABRAAO RIBEIRO DA SILVA": 0.70,
+    "ARTHUR MOTA RODRIGUES": 0.50,
+    "BRUNO TERRA DE ASSUNCAO": 0.60,
+    "CAIO DOS SANTOS CARLOS": 0.40,
+    "CARLOS ALEXANDRE IGNACIO DA SILVA": 0.50,
+    "CARLOS EDUARDO CAMERA LOUREIRO PINTO": 0.60,
+    "CELSO LUIZ DE OLIVEIRA JUNIOR": 0.60,
+    "DANIEL MAGRINA GUIMARAES": 0.40,
+    "EDUARDO KAZAY": 0.70,
+    "EDUARDO MEYER": 0.70,
+    "EMANUEL NASCIMENTO CAVALCANTI": 0.80,
+    "EMERSON CERBINO DOBLAS": 0.50,
+    "EMERSON VIEIRA DE FARIAS JUNIOR": 0.70,
+    "FABIANO JOSE RAMOS BITTENCOURT": 0.75,
+    "FLAVIO LUIZ NUNES DE BARROS": 0.85,
+    "JADER DA MOTA MENDONCA": 0.80,
+    "JOAO VITOR ARAUJO SACCARDO": 0.50,
+    "JOICE ELIANA BRITES DE OLIVEIRA": 0.60,
+    "JONATHAN DA CUNHA VALENTE": 0.80,
+    "LEONARDO BARBOSA FRISONI": 0.80,
+    "LUCIANO HENRIQUE MATTOS DE ALMEIDA": 0.80,
+    "LUIZ FILIPE COSTA GARCIA": 0.80,
+    "MANSUR PAPICHO MIRANDA": 0.90,
+    "OTAVIO NUNES CARDOZO JÚNIOR": 0.60,  # se na base vier sem acento, posso duplicar a chave
     "PEDRO AMMAR FORATO": 0.80,
-    # "LEONARDO BARBOSA FRISONI": 0.70,
-    # "OUTRO ASSESSOR": 0.65,
+    "PEDRO BORGERTH TEIXEIRA DE LUCA": 0.70,
+    "RAFAEL MADALENA MARTINS": 0.80,
+    "ROBERTO DE MATTOS BRUNER": 0.70,
+    "RODRIGO RODRIGUES MARINO": 0.70,
+    "RUAN MARINS NOGUEIRA": 0.80,
+    "THIAGO KEMPER RICCIOPPO": 0.90,
+    "TIAGO DE CARVALHO RAMOS": 0.60,
+    "VANESSA PEREIRA DE OLIVEIRA": 0.70,
+}
+
+default_repasse = 0.70
+
 }
 
 default_repasse = 0.70
