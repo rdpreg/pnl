@@ -361,81 +361,84 @@ if all_dfs:
     st.markdown("---")
 
         # Seção PNL acumulado no ano
-    ano_selecionado = int(mes_selecionado.split("-")[0])
-    st.subheader(f"PNL acumulado no ano de {ano_selecionado}")
+ano_selecionado = int(mes_selecionado.split("-")[0])
+st.subheader(f"PNL acumulado no ano de {ano_selecionado}")
 
-    df_pnl_ytd = df_ass_mes[df_ass_mes["Ano"] == ano_selecionado].copy()
-    if df_pnl_ytd.empty:
-        st.warning("Nenhum dado para calcular PNL acumulado neste ano.")
-    else:
-        # Soma comissão bruta do ano por assessor
-        df_pnl_ytd = df_pnl_ytd.groupby("Assessor", as_index=False)["Comissao"].sum()
+df_pnl_ytd = df_ass_mes[df_ass_mes["Ano"] == ano_selecionado].copy()
+if df_pnl_ytd.empty:
+    st.warning("Nenhum dado para calcular PNL acumulado neste ano.")
+else:
+    # Soma comissão bruta do ano por assessor
+    df_pnl_ytd = df_pnl_ytd.groupby("Assessor", as_index=False)["Comissao"].sum()
 
-        # Comissão líquida após imposto
-        df_pnl_ytd["Comissao_Liquida"] = df_pnl_ytd["Comissao"] * FATOR_LIQUIDO
+    # Comissão líquida após imposto
+    df_pnl_ytd["Comissao_Liquida"] = df_pnl_ytd["Comissao"] * FATOR_LIQUIDO
 
-        # Repasse em cima da comissão líquida
-        df_pnl_ytd["Repasse"] = df_pnl_ytd["Assessor"].apply(get_repasse)
-        df_pnl_ytd["Para_Assessor"] = df_pnl_ytd["Comissao_Liquida"] * df_pnl_ytd["Repasse"]
-        df_pnl_ytd["Para_Empresa"] = df_pnl_ytd["Comissao_Liquida"] - df_pnl_ytd["Para_Assessor"]
+    # Repasse em cima da comissão líquida
+    df_pnl_ytd["Repasse"] = df_pnl_ytd["Assessor"].apply(get_repasse)
+    df_pnl_ytd["Para_Assessor"] = df_pnl_ytd["Comissao_Liquida"] * df_pnl_ytd["Repasse"]
+    df_pnl_ytd["Para_Empresa"] = df_pnl_ytd["Comissao_Liquida"] - df_pnl_ytd["Para_Assessor"]
 
-        # % da comissão líquida do assessor que ficou para a empresa
-        df_pnl_ytd["Pct_Empresa_sobre_Comissao"] = (
-            df_pnl_ytd["Para_Empresa"] / df_pnl_ytd["Comissao_Liquida"]
+    # Total que ficou para a empresa no ano inteiro
+    total_empresa_ano = df_pnl_ytd["Para_Empresa"].sum()
+
+    # % do total da empresa que cada assessor gerou
+    df_pnl_ytd["Pct_Empresa_sobre_Total"] = (
+        df_pnl_ytd["Para_Empresa"] / total_empresa_ano
+    )
+
+    df_pnl_ytd = df_pnl_ytd.sort_values("Para_Empresa", ascending=False)
+
+    # Montar tabela para exibição
+    tabela_pnl_ytd = pd.DataFrame({
+        "Assessor": df_pnl_ytd["Assessor"],
+        "Comissão bruta": df_pnl_ytd["Comissao"],
+        "Comissão líquida": df_pnl_ytd["Comissao_Liquida"],
+        "Repasse": df_pnl_ytd["Repasse"],
+        "Para assessor": df_pnl_ytd["Para_Assessor"],
+        "Para empresa": df_pnl_ytd["Para_Empresa"],
+        "% empresa do total anual": df_pnl_ytd["Pct_Empresa_sobre_Total"],
+    }).reset_index(drop=True)
+
+    # Formatação em R$
+    for col in ["Comissão bruta", "Comissão líquida", "Para assessor", "Para empresa"]:
+        tabela_pnl_ytd[col] = tabela_pnl_ytd[col].apply(formata_brl)
+
+    # Formatar percentuais
+    tabela_pnl_ytd["Repasse"] = tabela_pnl_ytd["Repasse"].apply(lambda x: f"{x*100:.0f}%")
+    tabela_pnl_ytd["% empresa do total anual"] = tabela_pnl_ytd["% empresa do total anual"].apply(
+        lambda x: f"{x*100:.1f}%"
+    )
+
+    col_y1, col_y2 = st.columns([2, 1])
+
+    with col_y1:
+        df_plot_ytd = df_pnl_ytd.melt(
+            id_vars=["Assessor"],
+            value_vars=["Para_Assessor", "Para_Empresa"],
+            var_name="Tipo",
+            value_name="Valor"
         )
+        df_plot_ytd["Tipo"] = df_plot_ytd["Tipo"].replace({
+            "Para_Assessor": "Para o assessor",
+            "Para_Empresa": "Para a empresa"
+        })
 
-        df_pnl_ytd = df_pnl_ytd.sort_values("Comissao_Liquida", ascending=False)
-
-        tabela_pnl_ytd = pd.DataFrame({
-            "Assessor": df_pnl_ytd["Assessor"],
-            "Comissão bruta": df_pnl_ytd["Comissao"],
-            "Comissão líquida": df_pnl_ytd["Comissao_Liquida"],
-            "Repasse": df_pnl_ytd["Repasse"],
-            "Para assessor": df_pnl_ytd["Para_Assessor"],
-            "Para empresa": df_pnl_ytd["Para_Empresa"],
-            "% empresa / comissão": df_pnl_ytd["Pct_Empresa_sobre_Comissao"],
-        }).reset_index(drop=True)
-
-        # Formatação em R$
-        for col in ["Comissão bruta", "Comissão líquida", "Para assessor", "Para empresa"]:
-            tabela_pnl_ytd[col] = tabela_pnl_ytd[col].apply(formata_brl)
-
-        # Formatação dos percentuais
-        tabela_pnl_ytd["Repasse"] = tabela_pnl_ytd["Repasse"].apply(
-            lambda x: f"{x*100:.0f}%"
+        fig_pnl_ytd = px.bar(
+            df_plot_ytd,
+            x="Assessor",
+            y="Valor",
+            color="Tipo",
+            barmode="group",
+            labels={"Valor": "Valor", "Assessor": "Assessor", "Tipo": "Tipo"},
+            title="PNL acumulado por assessor no ano (comissão líquida)"
         )
-        tabela_pnl_ytd["% empresa / comissão"] = tabela_pnl_ytd["% empresa / comissão"].apply(
-            lambda x: f"{x*100:.1f}%"
-        )
+        st.plotly_chart(fig_pnl_ytd, use_container_width=True)
 
-        col_y1, col_y2 = st.columns([2, 1])
+    with col_y2:
+        st.markdown("Tabela de PNL acumulado no ano")
+        st.dataframe(tabela_pnl_ytd)
 
-        with col_y1:
-            df_plot_ytd = df_pnl_ytd.melt(
-                id_vars=["Assessor"],
-                value_vars=["Para_Assessor", "Para_Empresa"],
-                var_name="Tipo",
-                value_name="Valor"
-            )
-            df_plot_ytd["Tipo"] = df_plot_ytd["Tipo"].replace({
-                "Para_Assessor": "Para o assessor",
-                "Para_Empresa": "Para a empresa"
-            })
-
-            fig_pnl_ytd = px.bar(
-                df_plot_ytd,
-                x="Assessor",
-                y="Valor",
-                color="Tipo",
-                barmode="group",
-                labels={"Valor": "Valor", "Assessor": "Assessor", "Tipo": "Tipo"},
-                title="PNL acumulado por assessor no ano selecionado (comissão líquida)"
-            )
-            st.plotly_chart(fig_pnl_ytd, use_container_width=True)
-
-        with col_y2:
-            st.markdown("Tabela de PNL acumulado no ano")
-            st.dataframe(tabela_pnl_ytd)
 
 
 else:
