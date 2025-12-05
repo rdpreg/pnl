@@ -66,9 +66,6 @@ repasse_por_assessor = {
 
 default_repasse = 0.70
 
-}
-
-default_repasse = 0.70
 
 ALIQUOTA_IMPOSTO = 0.1953
 FATOR_LIQUIDO = 1 - ALIQUOTA_IMPOSTO  # 0.8047
