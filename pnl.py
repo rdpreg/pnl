@@ -360,7 +360,7 @@ if all_dfs:
 
     st.markdown("---")
 
-    # Seção PNL acumulado no ano
+        # Seção PNL acumulado no ano
     ano_selecionado = int(mes_selecionado.split("-")[0])
     st.subheader(f"PNL acumulado no ano de {ano_selecionado}")
 
@@ -379,6 +379,11 @@ if all_dfs:
         df_pnl_ytd["Para_Assessor"] = df_pnl_ytd["Comissao_Liquida"] * df_pnl_ytd["Repasse"]
         df_pnl_ytd["Para_Empresa"] = df_pnl_ytd["Comissao_Liquida"] - df_pnl_ytd["Para_Assessor"]
 
+        # % da comissão líquida do assessor que ficou para a empresa
+        df_pnl_ytd["Pct_Empresa_sobre_Comissao"] = (
+            df_pnl_ytd["Para_Empresa"] / df_pnl_ytd["Comissao_Liquida"]
+        )
+
         df_pnl_ytd = df_pnl_ytd.sort_values("Comissao_Liquida", ascending=False)
 
         tabela_pnl_ytd = pd.DataFrame({
@@ -388,13 +393,19 @@ if all_dfs:
             "Repasse": df_pnl_ytd["Repasse"],
             "Para assessor": df_pnl_ytd["Para_Assessor"],
             "Para empresa": df_pnl_ytd["Para_Empresa"],
+            "% empresa / comissão": df_pnl_ytd["Pct_Empresa_sobre_Comissao"],
         }).reset_index(drop=True)
 
+        # Formatação em R$
         for col in ["Comissão bruta", "Comissão líquida", "Para assessor", "Para empresa"]:
             tabela_pnl_ytd[col] = tabela_pnl_ytd[col].apply(formata_brl)
 
+        # Formatação dos percentuais
         tabela_pnl_ytd["Repasse"] = tabela_pnl_ytd["Repasse"].apply(
             lambda x: f"{x*100:.0f}%"
+        )
+        tabela_pnl_ytd["% empresa / comissão"] = tabela_pnl_ytd["% empresa / comissão"].apply(
+            lambda x: f"{x*100:.1f}%"
         )
 
         col_y1, col_y2 = st.columns([2, 1])
@@ -425,6 +436,7 @@ if all_dfs:
         with col_y2:
             st.markdown("Tabela de PNL acumulado no ano")
             st.dataframe(tabela_pnl_ytd)
+
 
 else:
     # Sem dados consolidados ainda
