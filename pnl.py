@@ -439,8 +439,6 @@ else:
         st.markdown("Tabela de PNL acumulado no ano")
         st.dataframe(tabela_pnl_ytd)
 
-
-
 else:
     # Sem dados consolidados ainda
     pass
