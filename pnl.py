@@ -33,12 +33,12 @@ def tratar_relatorio(file, competencia_date):
     8 -> Comissão
 
     Preenche o nome do assessor para baixo
-    Remove cabeçalhos e linhas vazias
-    Adiciona coluna de competência
+    Remove cabeçalhos e linhas totalmente vazias
+    Adiciona coluna de competência (mês e ano)
     """
     df = pd.read_excel(file)
 
-    # Seleciona colunas 5, 6, 7, 8 (índices 5,6,7,8 na base zero)
+    # Seleciona colunas 5, 6, 7, 8 (índices 5,6,7,8)
     df2 = df.iloc[:, [5, 6, 7, 8]].copy()
     df2.columns = ["Assessor", "Conta", "Receita_Liquida", "Comissao"]
 
@@ -49,12 +49,14 @@ def tratar_relatorio(file, competencia_date):
     df2 = df2[df2["Assessor"].notna()]
     df2 = df2[df2["Assessor"] != "Assessor Principal"]
 
-    # Remover linhas onde não há comissão nem receita
+    # Converter colunas numéricas
     df2["Receita_Liquida"] = pd.to_numeric(df2["Receita_Liquida"], errors="coerce")
     df2["Comissao"] = pd.to_numeric(df2["Comissao"], errors="coerce")
+
+    # Remover linhas sem qualquer valor numérico
     df2 = df2[~(df2["Receita_Liquida"].isna() & df2["Comissao"].isna())]
 
-    # Adicionar competência (primeiro dia do mês)
+    # Adicionar competência
     competencia_ts = pd.to_datetime(competencia_date)
     df2["Competencia"] = competencia_ts
     df2["Ano"] = df2["Competencia"].dt.year
@@ -68,20 +70,48 @@ all_dfs = []
 if uploaded_files:
     st.subheader("Defina a competência de cada arquivo")
 
+    ano_atual = date.today().year
+    anos_possiveis = list(range(ano_atual - 5, ano_atual + 1))
+
+    meses_dict = {
+        1: "Jan",
+        2: "Fev",
+        3: "Mar",
+        4: "Abr",
+        5: "Mai",
+        6: "Jun",
+        7: "Jul",
+        8: "Ago",
+        9: "Set",
+        10: "Out",
+        11: "Nov",
+        12: "Dez",
+    }
+
     for file in uploaded_files:
-        col1, col2 = st.columns([2, 1])
+        st.markdown(f"**Arquivo:** {file.name}")
+        col1, col2 = st.columns(2)
+
         with col1:
-            st.markdown(f"**Arquivo:** {file.name}")
-        with col2:
-            competencia_input = st.date_input(
-                f"Competência para {file.name}",
-                value=date(date.today().year, date.today().month, 1),
-                key=file.name
+            ano_sel = st.selectbox(
+                f"Ano do relatório para {file.name}",
+                options=anos_possiveis,
+                index=len(anos_possiveis) - 1,
+                key=f"ano_{file.name}"
             )
 
-        if competencia_input:
-            df_tratado = tratar_relatorio(file, competencia_input)
-            all_dfs.append(df_tratado)
+        with col2:
+            mes_sel = st.selectbox(
+                f"Mês do relatório para {file.name}",
+                options=list(meses_dict.keys()),
+                format_func=lambda m: meses_dict[m],
+                index=date.today().month - 1,
+                key=f"mes_{file.name}"
+            )
+
+        competencia_input = date(ano_sel, mes_sel, 1)
+        df_tratado = tratar_relatorio(file, competencia_input)
+        all_dfs.append(df_tratado)
 
 if not uploaded_files:
     st.info("Envie ao menos um arquivo para iniciar o dashboard.")
@@ -94,7 +124,7 @@ if all_dfs:
     with st.expander("Ver tabela completa"):
         st.dataframe(base)
 
-    # Botão para download da base tratada
+    # Função para gerar Excel da base consolidada
     def to_excel_bytes(df):
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
@@ -113,19 +143,16 @@ if all_dfs:
     st.markdown("---")
 
     # Agregações para os gráficos
-    # Total de comissão por mês
     df_mes = (
         base.groupby("Mes_Ano", as_index=False)["Comissao"].sum()
         .sort_values("Mes_Ano")
     )
 
-    # Comissão por assessor e mês
     df_ass_mes = (
         base.groupby(["Mes_Ano", "Assessor"], as_index=False)["Comissao"].sum()
         .sort_values(["Mes_Ano", "Assessor"])
     )
 
-    # Filtros
     st.subheader("Filtros")
 
     col_f1, col_f2 = st.columns(2)
@@ -149,7 +176,6 @@ if all_dfs:
         df_ass_mes["Assessor"].isin(assessores_selecionados)
     ]
 
-    # Linha do tempo da comissão total
     st.subheader("Evolução mensal da comissão total")
     fig_total = px.line(
         df_mes,
@@ -161,7 +187,6 @@ if all_dfs:
     )
     st.plotly_chart(fig_total, use_container_width=True)
 
-    # Comissão por assessor ao longo dos meses
     st.subheader("Evolução da comissão por assessor")
     if not df_ass_mes_filtrado.empty:
         fig_ass = px.line(
@@ -177,7 +202,6 @@ if all_dfs:
     else:
         st.warning("Nenhum dado para os assessores selecionados.")
 
-    # Ranking de assessores no mês selecionado
     st.subheader(f"Ranking de assessores em {mes_selecionado}")
     df_ranking = (
         df_ass_mes[df_ass_mes["Mes_Ano"] == mes_selecionado]
@@ -200,7 +224,3 @@ if all_dfs:
     with col_g2:
         st.markdown("**Tabela de ranking**")
         st.dataframe(df_ranking.reset_index(drop=True))
-
-else:
-    # Sem dados consolidados ainda
-    pass
