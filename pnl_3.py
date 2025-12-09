@@ -406,45 +406,45 @@ if all_dfs:
 # 2. RECEITA DOS ASSESSORES POR CATEGORIA (mês selecionado)
 # ================================================================
 
-st.subheader(f"Receita dos assessores por categoria em {mes_selecionado}")
+    st.subheader(f"Receita dos assessores por categoria em {mes_selecionado}")
 
-df_ass_cat = (
-    base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
-    .groupby(["Assessor", "Categoria"], as_index=False)["Comissao"]
-    .sum()
-)
-
-if df_ass_cat.empty:
-    st.warning("Nenhum dado de assessor x categoria no mês selecionado.")
-else:
-    # tabela pivotada
-    df_pivot = df_ass_cat.pivot_table(
-        index="Assessor",
-        columns="Categoria",
-        values="Comissao",
-        aggfunc="sum",
-        fill_value=0
+    df_ass_cat = (
+        base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
+        .groupby(["Assessor", "Categoria"], as_index=False)["Comissao"]
+        .sum()
     )
 
-    df_pivot_fmt = df_pivot.applymap(formata_brl)
-
-    col_ac1, col_ac2 = st.columns([2, 1])
-
-    with col_ac1:
-        fig_stack = px.bar(
-            df_ass_cat,
-            x="Assessor",
-            y="Comissao",
-            color="Categoria",
-            title=f"Composição de receita por categoria para cada assessor ({mes_selecionado})",
-            labels={"Comissao": "Receita"}
+    if df_ass_cat.empty:
+        st.warning("Nenhum dado de assessor x categoria no mês selecionado.")
+    else:
+        # tabela pivotada
+        df_pivot = df_ass_cat.pivot_table(
+            index="Assessor",
+            columns="Categoria",
+            values="Comissao",
+            aggfunc="sum",
+            fill_value=0
         )
-        fig_stack.update_xaxes(type="category")
-        st.plotly_chart(fig_stack, use_container_width=True)
 
-    with col_ac2:
-        st.markdown("Tabela (assessor x categoria)")
-        st.dataframe(df_pivot_fmt)
+        df_pivot_fmt = df_pivot.applymap(formata_brl)
+
+        col_ac1, col_ac2 = st.columns([2, 1])
+
+        with col_ac1:
+            fig_stack = px.bar(
+                df_ass_cat,
+                x="Assessor",
+                y="Comissao",
+                color="Categoria",
+                title=f"Composição de receita por categoria para cada assessor ({mes_selecionado})",
+                labels={"Comissao": "Receita"}
+            )
+            fig_stack.update_xaxes(type="category")
+            st.plotly_chart(fig_stack, use_container_width=True)
+
+        with col_ac2:
+            st.markdown("Tabela (assessor x categoria)")
+            st.dataframe(df_pivot_fmt)
 
 
     # =========================
