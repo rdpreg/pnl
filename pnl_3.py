@@ -17,8 +17,8 @@ Este app lê a **planilha detalhada de receitas** (Agente Autônomo e Corban),
 trata a base e monta um painel de acompanhamento da evolução mensal
 das comissões por assessor.
 
-- Mantém as categorias originais de cada base
-- Usa a coluna **Categoria** para identificar se a origem é AA ou CORBAN
+- Mantém as categorias originais de cada base  
+- Usa a coluna **Categoria** para identificar se a origem é AA ou CORBAN  
 - PNL sempre calculado sobre a **comissão total** da linha
 """
 )
@@ -33,7 +33,6 @@ uploaded_files = st.file_uploader(
 # Configurações de PNL
 # =========================
 
-# use sempre o nome em maiúsculas, igual vem na planilha tratada
 repasse_por_assessor = {
     "ABRAAO RIBEIRO DA SILVA": 0.70,
     "ARTHUR MOTA RODRIGUES": 0.50,
@@ -87,7 +86,7 @@ def formata_brl(x):
     return f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-# categorias da planilha Corban, para identificar origem
+# categorias da planilha Corban para identificar origem
 CATEGORIAS_CORBAN = {
     "CAMBIO",
     "CONTA VIRADA",
@@ -103,14 +102,33 @@ CATEGORIAS_CORBAN = {
 def tratar_detalhado(file):
     """
     Lê a planilha detalhada e normaliza as colunas.
-    Espera os cabeçalhos:
+    Funciona mesmo que o cabeçalho não esteja na primeira linha.
+
+    Espera encontrar uma linha com 'Data Receita' na primeira coluna
+    e, a partir dela, os campos:
+
     Data Receita, Conta, Cliente, Código Assessor, Assessor Principal,
     Categoria, Produto, Ativo, Código/CNPJ, Tipo Receita,
     Receita Bruta, Receita Líquida, Comissão.
     """
-    df = pd.read_excel(file)
+    # lê tudo sem cabeçalho
+    raw = pd.read_excel(file, sheet_name=0, header=None)
 
-    # remove espaços e padroniza cabeçalhos
+    # procura a linha onde a primeira coluna é "Data Receita"
+    first_col = raw.iloc[:, 0].astype(str).str.strip().str.upper()
+    header_mask = first_col == "DATA RECEITA"
+    if not header_mask.any():
+        st.error(
+            f"Não encontrei a linha de cabeçalho com 'Data Receita' no arquivo {file.name}."
+        )
+        st.stop()
+
+    header_idx = header_mask[header_mask].index[0]
+    header = raw.iloc[header_idx].tolist()
+
+    # dados começam na linha seguinte ao cabeçalho
+    df = raw.iloc[header_idx + 1 :].copy()
+    df.columns = header
     df.columns = df.columns.astype(str).str.strip()
 
     rename_map = {
@@ -129,16 +147,17 @@ def tratar_detalhado(file):
         "Comissão": "Comissao",
     }
 
-    # checagem básica de colunas
     faltando = [c for c in rename_map.keys() if c not in df.columns]
     if faltando:
-        st.error(f"No arquivo {file.name} faltam as colunas: {faltando}")
+        st.error(f"No arquivo {file.name} ainda faltam as colunas: {faltando}")
         st.stop()
 
     df = df.rename(columns=rename_map)
 
     # conversões
-    df["Data_Receita"] = pd.to_datetime(df["Data_Receita"], errors="coerce", dayfirst=True)
+    df["Data_Receita"] = pd.to_datetime(
+        df["Data_Receita"], errors="coerce", dayfirst=True
+    )
     df = df[df["Data_Receita"].notna()]
 
     for col in ["Receita_Bruta", "Receita_Liquida", "Comissao"]:
@@ -154,7 +173,9 @@ def tratar_detalhado(file):
 
     # origem com base na categoria
     cat_upper = df["Categoria"].str.upper()
-    df["Origem"] = cat_upper.apply(lambda x: "CORBAN" if x in CATEGORIAS_CORBAN else "AA")
+    df["Origem"] = cat_upper.apply(
+        lambda x: "CORBAN" if x in CATEGORIAS_CORBAN else "AA"
+    )
 
     return df
 
@@ -227,6 +248,7 @@ if all_dfs:
         )
 
     col_f4, col_f5 = st.columns(2)
+
     with col_f4:
         produtos_unicos = sorted(base["Produto"].unique())
         produtos_selecionados = st.multiselect(
@@ -242,7 +264,6 @@ if all_dfs:
             options=meses_unicos
         )
 
-    # aplica filtros na base detalhada
     mask = (
         base["Assessor"].isin(assessores_selecionados)
         & base["Origem"].isin(origens_selecionadas)
@@ -256,7 +277,7 @@ if all_dfs:
         st.stop()
 
     # =========================
-    # Agregações para gráficos
+    # Agregações
     # =========================
 
     df_mes = (
