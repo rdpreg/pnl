@@ -108,7 +108,7 @@ def trata_base_corban(files):
             st.error(f"No arquivo {f.name} faltam as colunas: {faltando}")
             st.stop()
 
-        df = df.rename(columns={{
+        df = df.rename(columns={
             COL_ASSESSOR_CORBAN: "assessor",
             COL_MES_CORBAN: "mes",
             COL_VALOR_CORBAN: "comissao_corban",
