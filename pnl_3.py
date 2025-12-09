@@ -357,6 +357,96 @@ if all_dfs:
 
     st.markdown("---")
 
+    # ================================================================
+# 1. RANKING DE RECEITA POR CATEGORIA (mês selecionado)
+# ================================================================
+
+st.subheader(f"Ranking de receita por categoria em {mes_selecionado}")
+
+df_cat_mes = (
+    base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
+    .groupby("Categoria", as_index=False)["Comissao"]
+    .sum()
+    .sort_values("Comissao", ascending=False)
+)
+
+if df_cat_mes.empty:
+    st.warning("Nenhuma categoria encontrada no mês selecionado.")
+else:
+    df_cat_mes["Comissao_fmt"] = df_cat_mes["Comissao"].apply(formata_brl)
+    df_cat_mes["Pct"] = df_cat_mes["Comissao"] / df_cat_mes["Comissao"].sum()
+    df_cat_mes["Pct_fmt"] = df_cat_mes["Pct"].apply(lambda x: f"{x*100:.1f}%")
+
+    col_c1, col_c2 = st.columns([2, 1])
+
+    with col_c1:
+        fig_cat = px.bar(
+            df_cat_mes,
+            x="Comissao",
+            y="Categoria",
+            orientation="h",
+            labels={"Comissao": "Receita", "Categoria": "Categoria"},
+            title=f"Receita por categoria em {mes_selecionado}",
+        )
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+    with col_c2:
+        st.markdown("Tabela de receita por categoria")
+        st.dataframe(
+            df_cat_mes[["Categoria", "Comissao_fmt", "Pct_fmt"]].rename(
+                columns={"Comissao_fmt": "Receita", "Pct_fmt": "% do total"}
+            )
+        )
+
+
+st.markdown("---")
+
+
+# ================================================================
+# 2. RECEITA DOS ASSESSORES POR CATEGORIA (mês selecionado)
+# ================================================================
+
+st.subheader(f"Receita dos assessores por categoria em {mes_selecionado}")
+
+df_ass_cat = (
+    base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
+    .groupby(["Assessor", "Categoria"], as_index=False)["Comissao"]
+    .sum()
+)
+
+if df_ass_cat.empty:
+    st.warning("Nenhum dado de assessor x categoria no mês selecionado.")
+else:
+    # tabela pivotada
+    df_pivot = df_ass_cat.pivot_table(
+        index="Assessor",
+        columns="Categoria",
+        values="Comissao",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    df_pivot_fmt = df_pivot.applymap(formata_brl)
+
+    col_ac1, col_ac2 = st.columns([2, 1])
+
+    with col_ac1:
+        fig_stack = px.bar(
+            df_ass_cat,
+            x="Assessor",
+            y="Comissao",
+            color="Categoria",
+            title=f"Composição de receita por categoria para cada assessor ({mes_selecionado})",
+            labels={"Comissao": "Receita"}
+        )
+        fig_stack.update_xaxes(type="category")
+        st.plotly_chart(fig_stack, use_container_width=True)
+
+    with col_ac2:
+        st.markdown("Tabela (assessor x categoria)")
+        st.dataframe(df_pivot_fmt)
+
+
     # =========================
     # PNL do mês
     # =========================
