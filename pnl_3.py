@@ -358,48 +358,48 @@ if all_dfs:
     st.markdown("---")
 
     # ================================================================
-# 1. RANKING DE RECEITA POR CATEGORIA (mês selecionado)
-# ================================================================
+    # 1. RANKING DE RECEITA POR CATEGORIA (mês selecionado)
+    # ================================================================
 
-st.subheader(f"Ranking de receita por categoria em {mes_selecionado}")
+    st.subheader(f"Ranking de receita por categoria em {mes_selecionado}")
 
-df_cat_mes = (
-    base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
-    .groupby("Categoria", as_index=False)["Comissao"]
-    .sum()
-    .sort_values("Comissao", ascending=False)
-)
+    df_cat_mes = (
+        base_filtrada[base_filtrada["Mes_Ano"] == mes_selecionado]
+        .groupby("Categoria", as_index=False)["Comissao"]
+        .sum()
+        .sort_values("Comissao", ascending=False)
+    )
 
-if df_cat_mes.empty:
-    st.warning("Nenhuma categoria encontrada no mês selecionado.")
-else:
-    df_cat_mes["Comissao_fmt"] = df_cat_mes["Comissao"].apply(formata_brl)
-    df_cat_mes["Pct"] = df_cat_mes["Comissao"] / df_cat_mes["Comissao"].sum()
-    df_cat_mes["Pct_fmt"] = df_cat_mes["Pct"].apply(lambda x: f"{x*100:.1f}%")
+    if df_cat_mes.empty:
+        st.warning("Nenhuma categoria encontrada no mês selecionado.")
+    else:
+        df_cat_mes["Comissao_fmt"] = df_cat_mes["Comissao"].apply(formata_brl)
+        df_cat_mes["Pct"] = df_cat_mes["Comissao"] / df_cat_mes["Comissao"].sum()
+        df_cat_mes["Pct_fmt"] = df_cat_mes["Pct"].apply(lambda x: f"{x*100:.1f}%")
 
-    col_c1, col_c2 = st.columns([2, 1])
+        col_c1, col_c2 = st.columns([2, 1])
 
-    with col_c1:
-        fig_cat = px.bar(
-            df_cat_mes,
-            x="Comissao",
-            y="Categoria",
-            orientation="h",
-            labels={"Comissao": "Receita", "Categoria": "Categoria"},
-            title=f"Receita por categoria em {mes_selecionado}",
-        )
-        st.plotly_chart(fig_cat, use_container_width=True)
-
-    with col_c2:
-        st.markdown("Tabela de receita por categoria")
-        st.dataframe(
-            df_cat_mes[["Categoria", "Comissao_fmt", "Pct_fmt"]].rename(
-                columns={"Comissao_fmt": "Receita", "Pct_fmt": "% do total"}
+        with col_c1:
+            fig_cat = px.bar(
+                df_cat_mes,
+                x="Comissao",
+                y="Categoria",
+                orientation="h",
+                labels={"Comissao": "Receita", "Categoria": "Categoria"},
+                title=f"Receita por categoria em {mes_selecionado}",
             )
-        )
+            st.plotly_chart(fig_cat, use_container_width=True)
+
+        with col_c2:
+            st.markdown("Tabela de receita por categoria")
+            st.dataframe(
+                df_cat_mes[["Categoria", "Comissao_fmt", "Pct_fmt"]].rename(
+                    columns={"Comissao_fmt": "Receita", "Pct_fmt": "% do total"}
+                )
+            )
 
 
-st.markdown("---")
+    st.markdown("---")
 
 
 # ================================================================
